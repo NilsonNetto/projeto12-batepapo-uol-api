@@ -25,14 +25,26 @@ server.post('/participants', (req, res) => {
     name: name,
     lastStatus: Date.now()
   });
+  db.collection('messages').insertOne({
+    from: name,
+    to: 'Todos',
+    text: 'entra na sala...',
+    type: 'status',
+    time: dayjs().format('HH:mm:ss')
+  });
 
-  res.send('ok');
+  res.sendStatus(201);
 });
 
 server.get('/participants', async (req, res) => {
 
-  const participants = await db.collection('participants').find().toArray();
-  res.send(participants);
+  try {
+    const participants = await db.collection('participants').find().toArray();
+    res.send(participants);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
 });
 
 
@@ -48,13 +60,28 @@ server.post('/messages', (req, res) => {
     time: dayjs().format('HH:mm:ss')
   });
 
-  res.send('ok');
+  res.sendStatus(201);
 });
 
 server.get('/messages', async (req, res) => {
-  const messages = await db.collection('messages').find().toArray();
-  res.send(messages);
+  const user = req.headers.user;
+
+  try {
+    const messages = await db.collection('messages').find().toArray();
+    const filteredMessages = filterMessages(messages, user);
+    res.send(filteredMessages);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
+
 });
+
+function filterMessages(messages, user) {
+  const filtrados = messages.filter(value => { value.to === "Todos" || value.to === user; });
+  console.log(filtrados);
+  return filtrados;
+}
 
 server.listen(port, () => {
   console.log(`Listen on port ${port}`);
