@@ -31,7 +31,7 @@ const messageSchema = joi.object({
   type: joi.string().valid("message").valid("private_message").required(),
 });
 
-server.post('/participants', (req, res) => {
+server.post('/participants', async (req, res) => {
   const { name } = req.body;
   const newParticipant = { name, lastStatus: Date.now() };
 
@@ -40,19 +40,28 @@ server.post('/participants', (req, res) => {
   if (validation.error) {
     const errors = validation.error.details.map(detail => detail.message);
     console.log(errors);
-    return res.status(422).send(errors);
+    return res.status(409).send(errors);
   }
 
-  db.collection('participants').insertOne({ newParticipant });
-  db.collection('messages').insertOne({
-    from: name,
-    to: 'Todos',
-    text: 'entra na sala...',
-    type: 'status',
-    time: dayjs().format('HH:mm:ss')
-  });
+  try {
+    const repeatedUser = await db.collection('participants').findOne({ name: name });
+    if (repeatedUser) {
+      return res.status(422).send(`O nome ${name} já está sendo usado, escolha outro nome`);
+    }
 
-  res.sendStatus(201);
+    await db.collection('participants').insertOne({ ...newParticipant });
+    await db.collection('messages').insertOne({
+      from: name,
+      to: 'Todos',
+      text: 'entra na sala...',
+      type: 'status',
+      time: dayjs().format('HH:mm:ss')
+    });
+    res.sendStatus(201);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
 });
 
 server.get('/participants', async (req, res) => {
@@ -80,12 +89,16 @@ server.post('/messages', (req, res) => {
     return res.status(422).send(errors);
   }
 
-  db.collection('messages').insertOne({
-    ...message,
-    time: dayjs().format('HH:mm:ss')
-  });
-
-  res.sendStatus(201);
+  try {
+    db.collection('messages').insertOne({
+      ...message,
+      time: dayjs().format('HH:mm:ss')
+    });
+    res.sendStatus(201);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
 });
 
 server.get('/messages', async (req, res) => {
