@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dayjs from "dayjs";
 import joi from "joi";
 import dotenv from "dotenv";
@@ -125,6 +125,26 @@ function filterMessages(messages, user) {
   const filtered = messages.filter(message => (message.to === "Todos" || message.to === user));
   return filtered;
 }
+
+server.post('/status', async (req, res) => {
+  const checkParticipant = req.headers.user;
+
+  try {
+    const isParticipantActive = await db.collection('participants').findOne({ name: checkParticipant });
+
+    if (!isParticipantActive) {
+      return res.status(404).send('Usuário não está logado!');
+    }
+
+    await db.collection('participants').updateOne({ _id: ObjectId(isParticipantActive._id) },
+      { $set: { lastStatus: Date.now() } });
+    res.status(200).send('Login atualizado');
+
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
+});
 
 server.listen(port, () => {
   console.log(`Listen on port ${port}`);
