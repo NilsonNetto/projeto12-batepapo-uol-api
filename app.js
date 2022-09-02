@@ -76,7 +76,7 @@ server.get('/participants', async (req, res) => {
 });
 
 
-server.post('/messages', (req, res) => {
+server.post('/messages', async (req, res) => {
   const from = req.headers.user;
   const { to, text, type } = req.body;
   const message = { from, to, text, type, };
@@ -90,7 +90,13 @@ server.post('/messages', (req, res) => {
   }
 
   try {
-    db.collection('messages').insertOne({
+
+    const isUserlogged = await db.collection('participants').findOne({ name: from });
+    if (!isUserlogged) {
+      return res.status(422).send('Realize o login novamente para enviar a mensagem');
+    }
+
+    await db.collection('messages').insertOne({
       ...message,
       time: dayjs().format('HH:mm:ss')
     });
