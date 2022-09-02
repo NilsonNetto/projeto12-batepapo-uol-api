@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import dayjs from "dayjs";
+import joi from "joi";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -18,13 +19,31 @@ mongoClient.connect().then(() => {
   db = mongoClient.db('BatePapoUOL-API');
 });
 
+const participantSchema = joi.object({
+  name: joi.string().min(3).max(30).required(),
+  lastStatus: joi.required()
+});
+
+const messageSchema = joi.object({
+  from: joi.string().min(3).max(30).required(),
+  to: joi.string().min(3).max(30).required(),
+  text: joi.string().min(1).max(400).required(),
+  type: joi.string().valid("message").valid("private_message").required(),
+});
+
 server.post('/participants', (req, res) => {
   const { name } = req.body;
+  const newParticipant = { name, lastStatus: Date.now() };
 
-  db.collection('participants').insertOne({
-    name: name,
-    lastStatus: Date.now()
-  });
+  const validation = participantSchema.validate(newParticipant, { abortEarly: false });
+
+  if (validation.error) {
+    const errors = validation.error.details.map(detail => detail.message);
+    console.log(errors);
+    return res.status(422).send(errors);
+  }
+
+  db.collection('participants').insertOne({ newParticipant });
   db.collection('messages').insertOne({
     from: name,
     to: 'Todos',
@@ -51,12 +70,18 @@ server.get('/participants', async (req, res) => {
 server.post('/messages', (req, res) => {
   const from = req.headers.user;
   const { to, text, type } = req.body;
+  const message = { from, to, text, type, };
+
+  const validation = messageSchema.validate(message, { abortEarly: false });
+
+  if (validation.error) {
+    const errors = validation.error.details.map(detail => detail.message);
+    console.log(errors);
+    return res.status(422).send(errors);
+  }
 
   db.collection('messages').insertOne({
-    from,
-    to,
-    text,
-    type,
+    ...message,
     time: dayjs().format('HH:mm:ss')
   });
 
@@ -78,9 +103,8 @@ server.get('/messages', async (req, res) => {
 });
 
 function filterMessages(messages, user) {
-  const filtrados = messages.filter(value => { value.to === "Todos" || value.to === user; });
-  console.log(filtrados);
-  return filtrados;
+  const filtered = messages.filter(message => (message.to === "Todos" || message.to === user));
+  return filtered;
 }
 
 server.listen(port, () => {
