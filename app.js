@@ -40,13 +40,13 @@ server.post('/participants', async (req, res) => {
   if (validation.error) {
     const errors = validation.error.details.map(detail => detail.message);
     console.log(errors);
-    return res.status(409).send(errors);
+    return res.status(422).send(errors);
   }
 
   try {
     const repeatedUser = await db.collection('participants').findOne({ name: name });
     if (repeatedUser) {
-      return res.status(422).send(`O nome ${name} já está sendo usado, escolha outro nome`);
+      return res.status(409).send(`O nome ${name} já está sendo usado, escolha outro nome`);
     }
 
     await db.collection('participants').insertOne({ ...newParticipant });
@@ -109,11 +109,12 @@ server.post('/messages', async (req, res) => {
 
 server.get('/messages', async (req, res) => {
   const user = req.headers.user;
+  const { limit } = req.query;
 
   try {
     const messages = await db.collection('messages').find().toArray();
     const filteredMessages = filterMessages(messages, user);
-    res.send(filteredMessages);
+    res.send(filteredMessages.slice(-limit));
   } catch (error) {
     console.log(error);
     res.sendStatus(500);
@@ -122,7 +123,7 @@ server.get('/messages', async (req, res) => {
 });
 
 function filterMessages(messages, user) {
-  const filtered = messages.filter(message => (message.to === "Todos" || message.to === user || message.from === user));
+  const filtered = messages.filter(message => (message.type === "message" || message.to === "Todos" || message.to === user || message.from === user));
   return filtered;
 }
 
