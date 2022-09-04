@@ -20,13 +20,13 @@ mongoClient.connect().then(() => {
 });
 
 const participantSchema = joi.object({
-  name: joi.string().min(3).max(30).required(),
+  name: joi.string().min(3).max(30).required().trim(),
   lastStatus: joi.required()
 });
 
 const messageSchema = joi.object({
-  from: joi.string().min(3).max(30).required(),
-  to: joi.string().min(3).max(30).required(),
+  from: joi.string().min(3).max(30).required().trim(),
+  to: joi.string().min(3).max(30).required().trim(),
   text: joi.string().min(1).max(400).required(),
   type: joi.string().valid("message").valid("private_message").required(),
 });
@@ -122,7 +122,7 @@ server.get('/messages', async (req, res) => {
 });
 
 function filterMessages(messages, user) {
-  const filtered = messages.filter(message => (message.to === "Todos" || message.to === user));
+  const filtered = messages.filter(message => (message.to === "Todos" || message.to === user || message.from === user));
   return filtered;
 }
 
@@ -145,6 +145,32 @@ server.post('/status', async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+async function removeInactive() {
+
+  try {
+    const allUsers = await db.collection('participants').find().toArray();
+
+    allUsers.forEach(async user => {
+      const lastUpdate = Date.now() - user.lastStatus;
+
+      if (lastUpdate >= 10000) {
+        await db.collection('participants').deleteOne({ _id: ObjectId(user._id) });
+        await db.collection('messages').insertOne({
+          from: user.name,
+          to: 'Todos',
+          text: 'saiu na sala...',
+          type: 'status',
+          time: dayjs().format('HH:mm:ss')
+        });
+      }
+    });
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+setInterval(removeInactive, 15000);
 
 server.listen(port, () => {
   console.log(`Listen on port ${port}`);
