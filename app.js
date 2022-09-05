@@ -114,6 +114,10 @@ server.get('/messages', async (req, res) => {
   try {
     const messages = await db.collection('messages').find().toArray();
     const filteredMessages = filterMessages(messages, user);
+
+    if (!limit || isNaN(limit)) {
+      return res.send(filteredMessages);
+    }
     res.send(filteredMessages.slice(-limit));
   } catch (error) {
     console.log(error);
